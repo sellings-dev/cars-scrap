@@ -1,0 +1,112 @@
+import scrapy
+from decimal import Decimal
+
+class CarsSpider(scrapy.Spider):
+    name = "cars"
+    allowed_domains = ["seminovos.com.br"]
+    start_urls = ["https://seminovos.com.br/carro?page={}&ajax".format(i+1) for i in range(700, 800)]
+
+    # def parse(self, response):
+    #     for anuncio in response.css('div.anuncio-container'):
+    #         if not anuncio.css('div.ad-list').get() is None:
+    #             continue
+    #         stringPreco, vendedor = anuncio.css('div.value a::text').getall()
+    #         if stringPreco.lower().strip() == 'valor a combinar':
+    #             continue
+    #         stringPreco = stringPreco.split('R$')[1].strip().replace('.', '').replace(',', '.')
+    #         preco = float(stringPreco)
+    #         vendedor = vendedor.split('\n')[1]
+
+    #         detalhes = anuncio.css('div.card-detalhes')
+    #         stringKilometragem = detalhes.css('div.kilometragem span::text').get()
+    #         if stringKilometragem.lower().strip() == 'não informada':
+    #             continue
+            
+    #         stringKilometragem = stringKilometragem.split('km')[0].replace('.', '')
+    #         kilometragem = int(stringKilometragem)
+
+    #         stringAno = detalhes.css('div.ano span::text').get()
+    #         ano = int(stringAno.split('/')[0])
+
+    #         linkToPage = anuncio.css('div.card-body a').get()
+
+    #         yield {
+    #             'carro': anuncio.css('div.card-header h4::text').get(),
+    #             'descricao': anuncio.css('div.card-header b::text').get(),
+    #             'preco': preco,
+    #             'ano': ano,
+    #             'kilometragem': kilometragem,
+    #             'combustivel': detalhes.css('div.combustivel span::text').get(),
+    #             'cambio': detalhes.css('div.cambio span::text').get(),
+    #             'acessorios': anuncio.css('div.acessorio::text').getall(),
+    #             'local': anuncio.css('div.localizacao span::text').get().split('\n')[1].strip(),
+    #             'vendedor': vendedor,
+    #             'teste': response.follow(linkToPage, callback=self.parseDetails)
+    #         }
+
+    def parse(self, response):
+        for anuncio in response.css('div.anuncio-container'):
+            if not anuncio.css('div.ad-list').get() is None:
+                continue
+            stringPreco = anuncio.css('div.value h4 a::text').get()
+            if stringPreco.lower().strip() == 'valor a combinar':
+                continue
+
+            detalhes = anuncio.css('div.card-detalhes')
+            stringKilometragem = detalhes.css('div.kilometragem span::text').get()
+            if stringKilometragem.lower().strip() == 'não informada':
+                continue
+
+            linkToPage = anuncio.css('div.card-body a::attr(href)').get()
+
+            yield response.follow(linkToPage, callback=self.parsePage)
+    
+    def parsePage(self, response):
+        info = response.css('section.info-topo')
+        tipo = info.css('a[itemprop="bodyType"]::attr(title)').get()
+        data = info.css('div.part-infos div.mr-1 span::text').get()
+
+        conteudo = response.css('section.veiculo-conteudo')
+        header = conteudo.css('div.part-marca-modelo-valor')
+        marca, modelo = header.css('h1::text').get().split(' ', 1)
+        descricao = header.css('span.desc::text').get().split('\n')[1]
+        motor = descricao.split(' ')[0]
+        preco = float(header.css('span.valor::text').get().replace('.', '').replace(',', '.'))
+        
+        detalhes = conteudo.css('div.part-items-detalhes-icones')
+        quilometragem = int(detalhes.css('div[title=Quilometragem] span.valor span::text').get().split(' ')[0].replace('.', ''))
+        cambio = detalhes.css('div[title=Câmbio] span.valor span::text').get()
+        ano = int(detalhes.css('div[title="Ano - Modelo"] span.valor span::text').get().split('/')[0])
+        portas = int(detalhes.css('div[title=Portas] span.valor span::text').get())
+        combustivel = detalhes.css('div[title=Combustível] span.valor span::text').get()
+        troca = detalhes.css('div[title="Troca?"] span.valor span::text').get()
+        cor = detalhes.css('div[title=cor] span.valor::text').get()
+
+        acessorios = conteudo.css('ul.lista-acessorios li span::text').getall()
+
+        sobre = conteudo.css('p.description-print::text').get().replace('\n', ' ')
+
+        if conteudo.css('div[id="veiculo-vendido"]').get() is None:
+            vendido = 'Não'
+        else:
+            vendido = 'Sim'
+
+        yield {
+            'marca': marca,
+            'modelo': modelo,
+            'tipo': tipo,
+            'motor': motor,
+            'descricao': descricao,
+            'preco': preco,
+            'quilometragem': quilometragem,
+            'cambio': cambio,
+            'ano': ano,
+            'portas': portas,
+            'combustivel': combustivel,
+            'troca': troca,
+            'cor': cor,
+            'acessorios': acessorios,
+            'sobre': sobre,
+            'vendido': vendido,
+            'data': data
+        }
