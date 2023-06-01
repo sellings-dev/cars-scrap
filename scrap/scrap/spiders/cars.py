@@ -4,7 +4,7 @@ from decimal import Decimal
 class CarsSpider(scrapy.Spider):
     name = "cars"
     allowed_domains = ["seminovos.com.br"]
-    start_urls = ["https://seminovos.com.br/carro?ordenarPor=5&page={}&ajax".format(i+1) for i in range(144, 800)]
+    start_urls = ["https://seminovos.com.br/carro?ordenarPor=5&page={}&ajax".format(i+1) for i in range(0, 900)]
 
     def parse(self, response):
         for anuncio in response.css('div.anuncio-container'):
